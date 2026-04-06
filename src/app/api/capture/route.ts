@@ -5,6 +5,18 @@ import { saveSummary } from '@/lib/db';
 
 export const dynamic = 'force-dynamic';
 
+// Handle CORS preflight
+export async function OPTIONS() {
+  return new NextResponse(null, {
+    status: 200,
+    headers: {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    },
+  });
+}
+
 // POST /api/capture - Receive captured page data from extension
 export async function POST(request: NextRequest) {
   try {
@@ -14,7 +26,7 @@ export async function POST(request: NextRequest) {
     if (!url || !listings) {
       return NextResponse.json(
         { error: 'url and listings are required' },
-        { status: 400 }
+        { status: 400, headers: { 'Access-Control-Allow-Origin': '*' } }
       );
     }
 
@@ -67,19 +79,19 @@ export async function POST(request: NextRequest) {
       snapshotId: newSnapshot.id,
       isNewPage: !previousSnapshot,
       summary: summary,
-    });
+    }, { headers: { 'Access-Control-Allow-Origin': '*' } });
   } catch (error: any) {
     console.error('Capture error:', error);
     console.error('Error stack:', error.stack);
     if (error.message?.includes('DATABASE_URL')) {
       return NextResponse.json(
         { error: 'Database not configured. Please add the DATABASE_URL environment variable in Vercel.', setupUrl: '/setup' },
-        { status: 503 }
+        { status: 503, headers: { 'Access-Control-Allow-Origin': '*' } }
       );
     }
     return NextResponse.json(
       { error: 'Failed to process capture: ' + (error.message || 'Unknown error'), details: error.message },
-      { status: 500 }
+      { status: 500, headers: { 'Access-Control-Allow-Origin': '*' } }
     );
   }
 }
@@ -88,11 +100,11 @@ export async function POST(request: NextRequest) {
 export async function GET() {
   try {
     const pages = await getTrackedPages();
-    return NextResponse.json({ pages });
+    return NextResponse.json({ pages }, { headers: { 'Access-Control-Allow-Origin': '*' } });
   } catch (error) {
     return NextResponse.json(
       { error: 'Failed to fetch tracked pages' },
-      { status: 500 }
+      { status: 500, headers: { 'Access-Control-Allow-Origin': '*' } }
     );
   }
 }
