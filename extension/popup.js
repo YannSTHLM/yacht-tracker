@@ -43,7 +43,7 @@ captureBtn.addEventListener('click', async () => {
   }
 
   captureBtn.disabled = true;
-  captureBtn.textContent = '⏳ Capturing...';
+  captureBtn.textContent = 'Capturing...';
   showStatus('Injecting content script...', 'info');
 
   const tab = await getCurrentTab();
@@ -64,7 +64,7 @@ captureBtn.addEventListener('click', async () => {
     if (listings.length === 0) {
       showStatus('No listings detected. Try scrolling the page first.', 'info');
       captureBtn.disabled = false;
-      captureBtn.textContent = '📸 Capture Listings';
+      captureBtn.textContent = 'Capture Listings';
       return;
     }
 
@@ -88,15 +88,15 @@ captureBtn.addEventListener('click', async () => {
     const data = await response.json();
 
     if (data.summary) {
-      showStatus('✅ ' + (data.summary.text || 'Capture successful!'), 'success');
+      showStatus('OK: ' + (data.summary.text || 'Capture successful!'), 'success');
     } else {
-      showStatus('✅ Capture successful! First baseline established.', 'success');
+      showStatus('OK: Capture successful! First baseline established.', 'success');
     }
   } catch (error) {
-    showStatus('❌ Error: ' + error.message, 'error');
+    showStatus('ERROR: ' + error.message, 'error');
   } finally {
     captureBtn.disabled = false;
-    captureBtn.textContent = '📸 Capture Listings';
+    captureBtn.textContent = 'Capture Listings';
   }
 });
 
