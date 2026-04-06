@@ -69,8 +69,10 @@ captureBtn.addEventListener('click', async () => {
     }
 
     const fullUrl = apiUrl + '/api/capture?x-vercel-protection-bypass=GIelFakUdfrjeM63HUhEVpeZC5WbTRwD&x-vercel-set-bypass-cookie=true';
-    showStatus('Sending to: ' + fullUrl, 'info');
+    console.log('=== YACHT TRACKER DEBUG ===');
     console.log('API URL:', fullUrl);
+    console.log('Listings count:', listings.length);
+    console.log('Page name:', pageName);
 
     // Send to API
     let response;
@@ -93,10 +95,14 @@ captureBtn.addEventListener('click', async () => {
     }
 
     const contentType = response.headers.get('content-type') || '';
+    console.log('Response status:', response.status);
+    console.log('Response content-type:', contentType);
+    
     if (!response.ok) {
       const text = await response.text();
+      console.log('Error response:', text.substring(0, 500));
       if (contentType.includes('text/html')) {
-        throw new Error('Server error ' + response.status + '. Check that DATABASE_URL is set in Vercel.');
+        throw new Error('Server error ' + response.status + '. Check that DATABASE_URL is set in Vercel. URL: ' + fullUrl);
       }
       try {
         const errData = JSON.parse(text);
@@ -109,9 +115,11 @@ captureBtn.addEventListener('click', async () => {
     let data;
     if (contentType.includes('application/json')) {
       data = await response.json();
+      console.log('Response data:', data);
     } else {
       const text = await response.text();
-      throw new Error('Server returned non-JSON response (' + response.status + '): ' + text.substring(0, 200));
+      console.log('Non-JSON response:', text.substring(0, 500));
+      throw new Error('Server returned non-JSON response (' + response.status + '). URL: ' + fullUrl + ' Response: ' + text.substring(0, 300));
     }
 
     if (data.summary) {
