@@ -1,17 +1,21 @@
 import OpenAI from 'openai';
 
-let openai: OpenAI | null = null;
+let client: OpenAI | null = null;
 
-function getOpenAIClient(): OpenAI {
-  if (!openai) {
-    if (!process.env.OPENAI_API_KEY) {
-      throw new Error('OPENAI_API_KEY environment variable is required');
+function getAIClient(): OpenAI {
+  if (!client) {
+    if (!process.env.ZAI_API_KEY) {
+      throw new Error('ZAI_API_KEY environment variable is required');
     }
-    openai = new OpenAI({
-      apiKey: process.env.OPENAI_API_KEY,
+    if (!process.env.ZAI_BASE_URL) {
+      throw new Error('ZAI_BASE_URL environment variable is required');
+    }
+    client = new OpenAI({
+      apiKey: process.env.ZAI_API_KEY,
+      baseURL: process.env.ZAI_BASE_URL,
     });
   }
-  return openai;
+  return client;
 }
 
 interface YachtListing {
@@ -75,6 +79,8 @@ export async function generateChangeSummary(
     changes.removed_listings.length === 0 &&
     changes.price_changes.length === 0;
 
+  const model = process.env.ZAI_MODEL || 'glm-5.1';
+
   // Generate AI summary
   const prompt = `You are analyzing changes in yacht listings from "${pageUrl}".
 
@@ -95,9 +101,9 @@ ${changes.price_changes.map((c) => `  - ${c.new?.title || 'Unknown'}: ${c.old?.p
 Please provide a concise summary of the changes. Focus on the most interesting details like notable new yachts, significant price drops, etc.`;
 
   try {
-    const client = getOpenAIClient();
-    const response = await client.chat.completions.create({
-      model: 'gpt-4o-mini',
+    const aiClient = getAIClient();
+    const response = await aiClient.chat.completions.create({
+      model: model,
       messages: [
         {
           role: 'system',
@@ -112,7 +118,7 @@ Please provide a concise summary of the changes. Focus on the most interesting d
 
     return response.choices[0]?.message?.content || 'No summary generated.';
   } catch (error) {
-    console.error('OpenAI error:', error);
+    console.error('Z.ai API error:', error);
     return `Summary: ${changes.new_listings.length} new listings, ${changes.removed_listings.length} removed, ${changes.price_changes.length} price changes.`;
   }
 }

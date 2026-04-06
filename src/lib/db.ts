@@ -1,123 +1,152 @@
-import { sql } from '@vercel/postgres';
+import neo4j, { Driver, Session, Integer } from 'neo4j-driver';
 
-// Database schema initialization
-export async function initDB() {
-  await sql`
-    CREATE TABLE IF NOT EXISTS tracked_pages (
-      id SERIAL PRIMARY KEY,
-      url TEXT NOT NULL UNIQUE,
-      name TEXT,
-      created_at TIMESTAMP DEFAULT NOW(),
-      updated_at TIMESTAMP DEFAULT NOW()
-    );
-  `;
+let driver: Driver | null = null;
 
-  await sql`
-    CREATE TABLE IF NOT EXISTS snapshots (
-      id SERIAL PRIMARY KEY,
-      page_id INTEGER REFERENCES tracked_pages(id) ON DELETE CASCADE,
-      content JSONB NOT NULL,
-      created_at TIMESTAMP DEFAULT NOW()
-    );
-  `;
-
-  await sql`
-    CREATE TABLE IF NOT EXISTS summaries (
-      id SERIAL PRIMARY KEY,
-      page_id INTEGER REFERENCES tracked_pages(id) ON DELETE CASCADE,
-      previous_snapshot_id INTEGER REFERENCES snapshots(id),
-      current_snapshot_id INTEGER REFERENCES snapshots(id),
-      summary TEXT,
-      diff_type TEXT,
-      created_at TIMESTAMP DEFAULT NOW()
-    );
-  `;
+function getDriver(): Driver {
+  if (!driver) {
+    const uri = process.env.NEO4J_URI || 'bolt://localhost:7687';
+    const user = process.env.NEO4J_USER || 'neo4j';
+    const password = process.env.NEO4J_PASSWORD || '';
+    driver = neo4j.driver(uri, neo4j.auth.basic(user, password));
+  }
+  return driver;
 }
 
-// Get all tracked pages
-export async function getTrackedPages() {
-  const result = await sql`
-    SELECT * FROM tracked_pages ORDER BY created_at DESC
-  `;
-  return result.rows;
+async function runQuery(query: string, params: Record<string, any> = {}) {
+  const session: Session = getDriver().session();
+  try {
+    const result = await session.run(query, params);
+    return result;
+  } finally {
+    await session.close();
+  }
 }
 
-// Add a tracked page
-export async function addTrackedPage(url: string, name?: string) {
-  const result = await sql`
-    INSERT INTO tracked_pages (url, name)
-    VALUES (${url}, ${name || url})
-    ON CONFLICT (url) DO NOTHING
-    RETURNING *
-  `;
-  return result.rows[0] || null;
+function nodeToObj(node: any): Record<string, any> {
+  const properties = node.properties;
+  return {
+    id: node.identity.toString(),
+    ...properties,
+  };
 }
 
-// Get latest snapshot for a page
-export async function getLatestSnapshot(pageId: number) {
-  const result = await sql`
-    SELECT * FROM snapshots
-    WHERE page_id = ${pageId}
-    ORDER BY created_at DESC
+function parseNodeContent(node: any): Record<string, any> {
+  const properties = { ...node.properties };
+  if (properties.content && typeof properties.content === 'string') {
+    try {
+      properties.content = JSON.parse(properties.content);
+    } catch (e) {
+      // Keep as string if not valid JSON
+    }
+  }
+  return {
+    id: node.identity.toString(),
+    ...properties,
+  };
+}
+
+// Tracked Pages
+export async function getTrackedPages(): Promise<Record<string, any>[]> {
+  const result = await runQuery(`
+    MATCH (p:TrackedPage)
+    RETURN p
+    ORDER BY p.createdAt DESC
+  `);
+  return result.records.map((r: any) => nodeToObj(r.get('p')));
+}
+
+export async function addTrackedPage(url: string, name?: string): Promise<Record<string, any> | null> {
+  const result = await runQuery(`
+    MERGE (p:TrackedPage {url: $url})
+    ON CREATE SET p.name = $name, p.createdAt = datetime()
+    ON MATCH SET p.updatedAt = datetime()
+    RETURN p
+  `, { url, name: name || url });
+  if (result.records.length === 0) return null;
+  return nodeToObj(result.records[0].get('p'));
+}
+
+// Snapshots
+export async function getLatestSnapshot(pageId: string): Promise<Record<string, any> | null> {
+  const result = await runQuery(`
+    MATCH (p:TrackedPage) WHERE id(p) = toInteger($pageId)
+    MATCH (p)-[:HAS_SNAPSHOT]->(s:Snapshot)
+    RETURN s
+    ORDER BY s.createdAt DESC
     LIMIT 1
-  `;
-  return result.rows[0] || null;
+  `, { pageId });
+  if (result.records.length === 0) return null;
+  return parseNodeContent(result.records[0].get('s'));
 }
 
-// Save a snapshot
-export async function saveSnapshot(pageId: number, content: any) {
-  const result = await sql`
-    INSERT INTO snapshots (page_id, content)
-    VALUES (${pageId}, ${JSON.stringify(content)})
-    RETURNING *
-  `;
-  return result.rows[0];
+export async function saveSnapshot(pageId: string, content: any): Promise<Record<string, any>> {
+  const contentJson = JSON.stringify(content);
+  const result = await runQuery(`
+    MATCH (p:TrackedPage) WHERE id(p) = toInteger($pageId)
+    CREATE (s:Snapshot {content: $content, createdAt: datetime()})
+    CREATE (p)-[:HAS_SNAPSHOT]->(s)
+    RETURN s
+  `, { pageId, content: contentJson });
+  const node = result.records[0].get('s');
+  return { id: node.identity.toString(), content, createdAt: node.properties.createdAt };
 }
 
-// Get all snapshots for a page
-export async function getSnapshots(pageId: number) {
-  const result = await sql`
-    SELECT * FROM snapshots
-    WHERE page_id = ${pageId}
-    ORDER BY created_at DESC
-  `;
-  return result.rows;
+export async function getSnapshots(pageId: string): Promise<Record<string, any>[]> {
+  const result = await runQuery(`
+    MATCH (p:TrackedPage) WHERE id(p) = toInteger($pageId)
+    MATCH (p)-[:HAS_SNAPSHOT]->(s:Snapshot)
+    RETURN s
+    ORDER BY s.createdAt DESC
+  `, { pageId });
+  return result.records.map((r: any) => parseNodeContent(r.get('s')));
 }
 
-// Save a summary
+// Summaries
 export async function saveSummary(
-  pageId: number,
+  pageId: string,
   previousSnapshotId: number,
   currentSnapshotId: number,
   summary: string,
   diffType: string
-) {
-  const result = await sql`
-    INSERT INTO summaries 
-    (page_id, previous_snapshot_id, current_snapshot_id, summary, diff_type)
-    VALUES (${pageId}, ${previousSnapshotId}, ${currentSnapshotId}, ${summary}, ${diffType})
-    RETURNING *
-  `;
-  return result.rows[0];
+): Promise<Record<string, any>> {
+  const result = await runQuery(`
+    MATCH (p:TrackedPage) WHERE id(p) = toInteger($pageId)
+    CREATE (s:Summary {
+      summary: $summary,
+      diffType: $diffType,
+      createdAt: datetime()
+    })
+    CREATE (p)-[:HAS_SUMMARY]->(s)
+    RETURN s
+  `, { pageId, summary, diffType });
+  const node = result.records[0].get('s');
+  return { id: node.identity.toString(), ...node.properties };
 }
 
-// Get summaries for a page
-export async function getSummaries(pageId: number) {
-  const result = await sql`
-    SELECT * FROM summaries
-    WHERE page_id = ${pageId}
-    ORDER BY created_at DESC
-  `;
-  return result.rows;
+export async function getSummaries(pageId: string): Promise<Record<string, any>[]> {
+  const result = await runQuery(`
+    MATCH (p:TrackedPage) WHERE id(p) = toInteger($pageId)
+    MATCH (p)-[:HAS_SUMMARY]->(s:Summary)
+    RETURN s
+    ORDER BY s.createdAt DESC
+  `, { pageId });
+  return result.records.map((r: any) => nodeToObj(r.get('s')));
 }
 
-// Get all summaries with page info
-export async function getAllSummaries() {
-  const result = await sql`
-    SELECT s.*, tp.url, tp.name
-    FROM summaries s
-    JOIN tracked_pages tp ON s.page_id = tp.id
-    ORDER BY s.created_at DESC
-  `;
-  return result.rows;
+export async function getAllSummaries(): Promise<Record<string, any>[]> {
+  const result = await runQuery(`
+    MATCH (p:TrackedPage)-[:HAS_SUMMARY]->(s:Summary)
+    RETURN p, s
+    ORDER BY s.createdAt DESC
+  `);
+  return result.records.map((r: any) => {
+    const page = r.get('p');
+    const summary = r.get('s');
+    return {
+      id: summary.identity.toString(),
+      ...summary.properties,
+      url: page.properties.url,
+      name: page.properties.name,
+    };
+  });
 }
