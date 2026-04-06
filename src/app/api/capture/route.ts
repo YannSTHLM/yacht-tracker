@@ -70,6 +70,7 @@ export async function POST(request: NextRequest) {
     });
   } catch (error: any) {
     console.error('Capture error:', error);
+    console.error('Error stack:', error.stack);
     if (error.message?.includes('DATABASE_URL')) {
       return NextResponse.json(
         { error: 'Database not configured. Please add the DATABASE_URL environment variable in Vercel.', setupUrl: '/setup' },
@@ -77,7 +78,7 @@ export async function POST(request: NextRequest) {
       );
     }
     return NextResponse.json(
-      { error: 'Failed to process capture' },
+      { error: 'Failed to process capture: ' + (error.message || 'Unknown error'), details: error.message },
       { status: 500 }
     );
   }
