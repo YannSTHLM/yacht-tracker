@@ -81,11 +81,27 @@ captureBtn.addEventListener('click', async () => {
       }),
     });
 
+    const contentType = response.headers.get('content-type') || '';
     if (!response.ok) {
-      throw new Error('Server returned ' + response.status);
+      const text = await response.text();
+      if (contentType.includes('text/html')) {
+        throw new Error('Server error ' + response.status + '. Check that DATABASE_URL is set in Vercel.');
+      }
+      try {
+        const errData = JSON.parse(text);
+        throw new Error(errData.error || 'Server returned ' + response.status);
+      } catch (e) {
+        throw new Error('Server returned ' + response.status + ': ' + text.substring(0, 100));
+      }
     }
 
-    const data = await response.json();
+    let data;
+    if (contentType.includes('application/json')) {
+      data = await response.json();
+    } else {
+      const text = await response.text();
+      throw new Error('Unexpected server response. Check Vercel logs.');
+    }
 
     if (data.summary) {
       showStatus('OK: ' + (data.summary.text || 'Capture successful!'), 'success');
