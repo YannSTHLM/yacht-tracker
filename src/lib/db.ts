@@ -13,6 +13,11 @@ function getDriver(): Driver {
 }
 
 async function runQuery(query: string, params: Record<string, any> = {}) {
+  const uri = process.env.NEO4J_URI || 'bolt://localhost:7687';
+  // Check if database is configured
+  if (!process.env.NEO4J_PASSWORD || uri.includes('localhost')) {
+    throw new Error('NEO4J_URI and NEO4J_PASSWORD environment variables must be set. Configure your Neo4j Aura instance and add the values to Vercel.');
+  }
   const session: Session = getDriver().session();
   try {
     const result = await session.run(query, params);

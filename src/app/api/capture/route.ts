@@ -68,8 +68,14 @@ export async function POST(request: NextRequest) {
       isNewPage: !previousSnapshot,
       summary: summary,
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Capture error:', error);
+    if (error.message?.includes('NEO4J_URI') || error.message?.includes('NEO4J_PASSWORD')) {
+      return NextResponse.json(
+        { error: 'Database not configured. Please set up Neo4j and add NEO4J_URI, NEO4J_USER, and NEO4J_PASSWORD environment variables in Vercel.', setupUrl: '/setup' },
+        { status: 503 }
+      );
+    }
     return NextResponse.json(
       { error: 'Failed to process capture' },
       { status: 500 }
