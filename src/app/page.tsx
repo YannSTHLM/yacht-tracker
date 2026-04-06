@@ -31,6 +31,7 @@ export default function Home() {
   );
 
   const summaries: Summary[] = summariesData?.summaries || [];
+  const pages: Array<{ id: number; url: string; name: string; created_at: string }> = pagesData?.pages || [];
 
   const handleAddPage = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -181,6 +182,59 @@ export default function Home() {
           )}
         </div>
 
+        {/* Monitored Pages */}
+        <div
+          style={{
+            backgroundColor: '#fff',
+            borderRadius: '12px',
+            padding: '24px',
+            marginBottom: '24px',
+            boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+          }}
+        >
+          <h2 style={{ margin: '0 0 16px', fontSize: '18px', color: '#1e293b' }}>
+            Monitored Pages ({pages.length})
+          </h2>
+          {!pages.length ? (
+            <p style={{ color: '#94a3b8', fontSize: '14px', margin: 0 }}>
+              No pages monitored yet. Add a page above and use the browser extension to capture listings.
+            </p>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              {pages.map((page) => (
+                <div
+                  key={page.id}
+                  style={{
+                    backgroundColor: '#f8fafc',
+                    borderRadius: '8px',
+                    padding: '16px',
+                    border: '1px solid #e2e8f0',
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '8px' }}>
+                    <div style={{ flex: 1, minWidth: '200px' }}>
+                      <p style={{ margin: '0 0 4px', color: '#1e293b', fontSize: '15px', fontWeight: '600' }}>
+                        {page.name || page.url}
+                      </p>
+                      <a
+                        href={page.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{ color: '#2563eb', fontSize: '13px', textDecoration: 'none', wordBreak: 'break-all' }}
+                      >
+                        {page.url}
+                      </a>
+                    </div>
+                    <span style={{ color: '#94a3b8', fontSize: '12px', whiteSpace: 'nowrap' }}>
+                      Added {new Date(page.created_at).toLocaleDateString('en-SE')}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
         {/* Extension Info */}
         <div
           style={{
@@ -192,7 +246,7 @@ export default function Home() {
           }}
         >
           <h3 style={{ margin: '0 0 8px', color: '#1e40af', fontSize: '15px' }}>
-            📦 Browser Extension
+            Browser Extension
           </h3>
           <p style={{ margin: '0 0 12px', color: '#1e3a8a', fontSize: '13px' }}>
             Install the browser extension to capture yacht listings when browsing.
