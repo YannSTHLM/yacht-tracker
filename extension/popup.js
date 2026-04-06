@@ -68,11 +68,13 @@ captureBtn.addEventListener('click', async () => {
       return;
     }
 
-    showStatus('Sending data to server...', 'info');
+    const fullUrl = apiUrl + '/api/capture';
+    showStatus('Sending to: ' + fullUrl, 'info');
 
     // Send to API
-    const response = await fetch(apiUrl + '/api/capture', {
+    const response = await fetch(fullUrl, {
       method: 'POST',
+      mode: 'cors',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         url,
