@@ -100,7 +100,7 @@ captureBtn.addEventListener('click', async () => {
       data = await response.json();
     } else {
       const text = await response.text();
-      throw new Error('Unexpected server response. Check Vercel logs.');
+      throw new Error('Server returned non-JSON response (' + response.status + '): ' + text.substring(0, 200));
     }
 
     if (data.summary) {
