@@ -195,6 +195,10 @@ export default function Home() {
           <h2 style={{ margin: '0 0 16px', fontSize: '18px', color: '#1e293b' }}>
             Monitored Pages ({pages.length})
           </h2>
+          <p style={{ margin: '0 0 16px', color: '#64748b', fontSize: '13px' }}>
+            Scanning frequency: Every 6 hours via scheduled cron job. New checks at 00:00, 06:00, 12:00, 18:00 (UTC).
+            You can also manually trigger a scan using the browser extension.
+          </p>
           {!pages.length ? (
             <p style={{ color: '#94a3b8', fontSize: '14px', margin: 0 }}>
               No pages monitored yet. Add a page above and use the browser extension to capture listings.
