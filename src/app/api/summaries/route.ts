@@ -10,9 +10,9 @@ export async function GET() {
     return NextResponse.json({ summaries });
   } catch (error: any) {
     console.error('Summaries fetch error:', error);
-    if (error.message?.includes('NEO4J_URI') || error.message?.includes('NEO4J_PASSWORD')) {
+    if (error.message?.includes('DATABASE_URL')) {
       return NextResponse.json(
-        { error: 'Database not configured. Please set up Neo4j and add environment variables in Vercel.', setupUrl: '/setup' },
+        { error: 'Database not configured. Please add the DATABASE_URL environment variable in Vercel.', setupUrl: '/setup' },
         { status: 503 }
       );
     }
