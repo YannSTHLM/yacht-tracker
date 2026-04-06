@@ -68,20 +68,29 @@ captureBtn.addEventListener('click', async () => {
       return;
     }
 
-    const fullUrl = apiUrl + '/api/capture';
+    const fullUrl = apiUrl + '/api/capture?x-vercel-protection-bypass=GIelFakUdfrjeM63HUhEVpeZC5WbTRwD&x-vercel-set-bypass-cookie=true';
     showStatus('Sending to: ' + fullUrl, 'info');
+    console.log('API URL:', fullUrl);
 
     // Send to API
-    const response = await fetch(fullUrl, {
-      method: 'POST',
-      mode: 'cors',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        url,
-        listings,
-        name: pageName,
-      }),
-    });
+    let response;
+    try {
+      response = await fetch(fullUrl, {
+        method: 'POST',
+        mode: 'cors',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          url,
+          listings,
+          name: pageName,
+        }),
+      });
+    } catch (fetchError) {
+      showStatus('Network error: ' + fetchError.message + '. URL: ' + fullUrl, 'error');
+      captureBtn.disabled = false;
+      captureBtn.textContent = 'Capture Listings';
+      return;
+    }
 
     const contentType = response.headers.get('content-type') || '';
     if (!response.ok) {
