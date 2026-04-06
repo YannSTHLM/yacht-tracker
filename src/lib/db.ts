@@ -1,6 +1,7 @@
 import { Pool } from 'pg';
 
 let pool: Pool | null = null;
+let dbInitialized = false;
 
 function getPool(): Pool {
   if (!pool) {
@@ -15,7 +16,7 @@ function getPool(): Pool {
   return pool;
 }
 
-// Database schema initialization - call this once on startup
+// Database schema initialization
 const SCHEMA_QUERIES = [
   `CREATE TABLE IF NOT EXISTS tracked_pages (
     id SERIAL PRIMARY KEY,
@@ -41,19 +42,25 @@ const SCHEMA_QUERIES = [
   )`,
 ];
 
-export async function initDB(): Promise<void> {
-  const client = await getPool().connect();
+// Auto-initialize database on first use
+export async function ensureDBInitialized(): Promise<void> {
+  if (dbInitialized) return;
   try {
+    const p = getPool();
     for (const query of SCHEMA_QUERIES) {
-      await client.query(query);
+      await p.query(query);
     }
-  } finally {
-    client.release();
+    dbInitialized = true;
+    console.log('Database initialized successfully');
+  } catch (error) {
+    console.error('Failed to initialize database:', error);
+    throw error;
   }
 }
 
 // Tracked Pages
 export async function getTrackedPages(): Promise<Record<string, any>[]> {
+  await ensureDBInitialized();
   const client = await getPool().connect();
   try {
     const { rows } = await client.query('SELECT * FROM tracked_pages ORDER BY created_at DESC');
@@ -64,6 +71,7 @@ export async function getTrackedPages(): Promise<Record<string, any>[]> {
 }
 
 export async function addTrackedPage(url: string, name?: string): Promise<Record<string, any> | null> {
+  await ensureDBInitialized();
   const client = await getPool().connect();
   try {
     const result = await client.query(
@@ -80,6 +88,7 @@ export async function addTrackedPage(url: string, name?: string): Promise<Record
 
 // Snapshots
 export async function getLatestSnapshot(pageId: number): Promise<Record<string, any> | null> {
+  await ensureDBInitialized();
   const client = await getPool().connect();
   try {
     const result = await client.query(
@@ -94,6 +103,7 @@ export async function getLatestSnapshot(pageId: number): Promise<Record<string, 
 }
 
 export async function saveSnapshot(pageId: number, content: any): Promise<Record<string, any>> {
+  await ensureDBInitialized();
   const client = await getPool().connect();
   try {
     const result = await client.query(
@@ -107,6 +117,7 @@ export async function saveSnapshot(pageId: number, content: any): Promise<Record
 }
 
 export async function getSnapshots(pageId: number): Promise<Record<string, any>[]> {
+  await ensureDBInitialized();
   const client = await getPool().connect();
   try {
     const result = await client.query(
@@ -127,6 +138,7 @@ export async function saveSummary(
   summary: string,
   diffType: string
 ): Promise<Record<string, any>> {
+  await ensureDBInitialized();
   const client = await getPool().connect();
   try {
     const result = await client.query(
@@ -141,6 +153,7 @@ export async function saveSummary(
 }
 
 export async function getSummaries(pageId: number): Promise<Record<string, any>[]> {
+  await ensureDBInitialized();
   const client = await getPool().connect();
   try {
     const result = await client.query(
@@ -154,6 +167,7 @@ export async function getSummaries(pageId: number): Promise<Record<string, any>[
 }
 
 export async function getAllSummaries(): Promise<Record<string, any>[]> {
+  await ensureDBInitialized();
   const client = await getPool().connect();
   try {
     const result = await client.query(
